@@ -7,7 +7,7 @@ class TaskContract:
     user_request: str
     resolved_task: str
     task_type: str
-    requried_files: str
+    required_files: str
     allowed_files: list[str]
     forbidden_files: list[str]
     validation_profile: str
@@ -48,11 +48,11 @@ class ValidationResult:
     profile: str
     command_outputs: list[str]
     failure_type: str | None = None
-    repairable = bool = False
+    repairable : bool = False
 
 @dataclass
 class AgentResult:
-    agent_name = str
+    agent_name : str
     status: Literal["pass", "fail", "needs_repair"]
     output: object
     evidence: list[str] = field(default_factory=list)

@@ -8,7 +8,7 @@ WORKSPACE_ROOT = Path("workspace")
 class Validator: 
     def validate(self, task_contract: TaskContract) -> ValidationResult:
         missing_file = [
-            path for path in task_contract.requried_files
+            path for path in task_contract.required_files
             if not (WORKSPACE_ROOT / path).exists()
         ]
 

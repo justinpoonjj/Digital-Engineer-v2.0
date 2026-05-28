@@ -19,7 +19,7 @@ class ContextManager:
     
     def _read_required_files(self, task_contract: TaskContract) -> dict[str, str]:
         files = {}
-        for relative_path in task_contract.requried_files:
+        for relative_path in task_contract.required_files:
             files[relative_path] = self._read_text(relative_path)
         return files
     
