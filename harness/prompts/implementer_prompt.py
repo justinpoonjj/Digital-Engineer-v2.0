@@ -48,6 +48,10 @@ def build_implementer_prompt(context: ContextCapsule) -> str:
     files_text = "\n".join(files_section)
 
     return f"""
+WORKSPACE INSTRUCTION
+
+{context.instructions}
+    
 TASK CONTRACT
 
 task_id: 

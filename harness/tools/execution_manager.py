@@ -22,9 +22,10 @@ class ExecutionManager:
                 forbidden=forbidden,
             )
 
-            target_path = (WORKSPACE_ROOT / normalized_path).resolve()
+            workspace_root = WORKSPACE_ROOT.resolve()
+            target_path = (workspace_root / normalized_path).resolve()
 
-            if not str(target_path).startswith(str(WORKSPACE_ROOT)):
+            if not target_path.is_relative_to(workspace_root):
                 raise ValueError(f"Path escaped workspace: {change.path}")
             
             
@@ -40,15 +41,15 @@ class ExecutionManager:
         if not normalized_path:
             raise ValueError("Empty file path is not allowed")
         
-        if normalized_path.startswith("workspace/"):
-            raise ValueError(f"Invalid path includes workspace prefix: {normalized_path}")
-        
         if normalized_path.startswith("../") or "/../" in normalized_path:
             raise ValueError(f"Path traversal is not allowed: {normalized_path}")
         
         if normalized_path.startswith("/") or ":" in normalized_path:
             raise ValueError (f"Absolute paths are not allowed: {normalized_path}")
         
+        if not normalized_path.startswith(("src/", "tests/")):
+            raise ValueError(f"Path outside editable sandbox: {normalized_path}")
+
         if normalized_path in forbidden: 
             raise ValueError(f"Attempted to modify forbidden file: {normalized_path}")
         
