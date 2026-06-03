@@ -56,3 +56,10 @@ class AgentResult:
     status: Literal["pass", "fail", "needs_repair"]
     output: object
     evidence: list[str] = field(default_factory=list)
+
+@ dataclass
+class ReviewResult: 
+    passed: bool
+    summary: str
+    issues: list[str]
+    evidence: list[str]

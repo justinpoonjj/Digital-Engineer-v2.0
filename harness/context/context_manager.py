@@ -82,3 +82,19 @@ class ContextManager:
             ],
             output_format="CodeChangeContract",
         )
+    
+    def build_for_reviewer(self, task_contract: TaskContract) -> ContextCapsule:
+        return ContextCapsule(
+            agent_name="reviewer",
+            task_contract=task_contract,
+            instructions=self._read_text("AGENTS.md"),
+            relevant_files=self._read_required_files(task_contract),
+            relevant_state={},
+            constraints=[
+                "Review only the completed task.",
+                "Do not modify files",
+                "Check whether the implementation matches the task contract.",
+                "Do not claim success unless validation passed."
+            ],
+            output_format="ReviewResult",
+        )

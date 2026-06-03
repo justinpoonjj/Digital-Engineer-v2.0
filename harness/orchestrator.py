@@ -4,10 +4,12 @@ from harness.agents.Implementer import ImplementationAgent
 from harness.agents.planner import PlanningAgent
 from harness.agents.repairer import RepairAgent
 from harness.agents.task_resolver import TaskResolverAgent
+from harness.agents.reviewer import ReviewerAgent
 from harness.context.context_manager import ContextManager
 from harness.state.state_manager import StateManager
 from harness.tools.execution_manager import ExecutionManager
 from harness.validation.validator import Validator
+from harness.completion_gate import CompletionGate
 
 @dataclass
 class HarnessRunResult:
@@ -24,6 +26,8 @@ class Orchestrator:
         self.validator = Validator()
         self.repairer = RepairAgent()
         self.state_manager = StateManager()
+        self.reviewer = ReviewerAgent()
+        self.completion_gate = CompletionGate()
 
     def run(self, user_request: str) -> HarnessRunResult:
         task_contract = self.task_resolver.resolve(user_request)
@@ -70,24 +74,38 @@ class Orchestrator:
                     code_change_contract=repair_result.output,
                 )
                 validation_result = self.validator.validate(task_contract)
+
+        review_context = self.context_manager.build_for_reviewer(task_contract)
+        review_result = self.reviewer.run(
+            context=review_context,
+            validation_result=validation_result,
+        )
+
+        completion_certificate = self.completion_gate.evaluate(
+            task_contract=task_contract,
+            validation_result=validation_result,
+            review_result=review_result,
+        )
+
         self.state_manager.record_run(task_contract, validation_result)
 
-        if validation_result.passed:
+        if completion_certificate.passed:
             return HarnessRunResult(
                 success=True,
                 final_message=(
                     "Task completed successfully.\n"
                     f"Task: {task_contract.resolved_task}\n"
                     f"Validation profile: {validation_result.profile}"
+                    f"Review: {review_result.output.summary}"
                 ),
             )
         
         return HarnessRunResult(
             success=False,
             final_message=(
-                "Task failed validation.\n"
+                "Task did not pass completion review.\n"
                 f"Task: {task_contract.resolved_task}\n"
-                f"Failure type: {validation_result.failure_type}\n"
-                f"Output:\n{validation_result.command_outputs[-1] if validation_result.command_outputs else ''}"
+                f"Validation passed: {validation_result.passed}\n"
+                f"Review issues: {review_result.output.issues}"            
             ),
         )
