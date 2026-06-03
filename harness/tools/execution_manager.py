@@ -10,21 +10,48 @@ class ExecutionManager:
         task_contract: TaskContract,
         code_change_contract: CodeChangeContract,
     ) -> None:
-        allowed = set(task_contract.allowed_files)
-        forbidden = set(task_contract.forbidden_files)
+        allowed = {path.replace("\\", "/") for path in task_contract.allowed_files}
+        forbidden = {path.replace("\\", "/") for path in task_contract.forbidden_files}
 
         for change in code_change_contract.changes:
-            normalized_path = change.path.replace("\\", "/")
+            normalized_path = change.path.replace("\\","/").strip()
 
-            if normalized_path.startswith("workspace/"):
-                raise ValueError(f"Invalid path includes workspace prefix: {change.path}")
+            self._validate_path(
+                normalized_path=normalized_path,
+                allowed=allowed,
+                forbidden=forbidden,
+            )
+
+            workspace_root = WORKSPACE_ROOT.resolve()
+            target_path = (workspace_root / normalized_path).resolve()
+
+            if not target_path.is_relative_to(workspace_root):
+                raise ValueError(f"Path escaped workspace: {change.path}")
             
-            if normalized_path in forbidden:
-                raise ValueError(f"Attempted to modify forbidden file: {change.path}")
             
-            if normalized_path not in allowed:
-                raise ValueError("f:Attempted to modify file outside allowed scope: {change.path}")
-            
-            target_path = WORKSPACE_ROOT / normalized_path
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(change.content, encoding="utf-8")
+
+    def _validate_path(
+        self,
+        normalized_path: str,
+        allowed: set[str],
+        forbidden: set[str],
+    ) -> None:
+        if not normalized_path:
+            raise ValueError("Empty file path is not allowed")
+        
+        if normalized_path.startswith("../") or "/../" in normalized_path:
+            raise ValueError(f"Path traversal is not allowed: {normalized_path}")
+        
+        if normalized_path.startswith("/") or ":" in normalized_path:
+            raise ValueError (f"Absolute paths are not allowed: {normalized_path}")
+        
+        if not normalized_path.startswith(("src/", "tests/")):
+            raise ValueError(f"Path outside editable sandbox: {normalized_path}")
+
+        if normalized_path in forbidden: 
+            raise ValueError(f"Attempted to modify forbidden file: {normalized_path}")
+        
+        if normalized_path not in allowed:
+            raise ValueError(f"Attempted to modify file outside allowed scope: {normalized_path}")

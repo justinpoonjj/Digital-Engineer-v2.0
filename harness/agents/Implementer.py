@@ -1,80 +1,61 @@
-from harness.contracts import AgentResult, CodeChange, CodeChangeContract, ContextCapsule
+from harness.contracts import AgentResult, CodeChangeContract, ContextCapsule
+from harness.models.llm_service import LLMService
+from harness.prompts.implementer_prompt import (
+    build_implementer_instructions,
+    build_implementer_prompt,
+)
+from harness.tools.file_block_parser import FileBlockParseError, parse_file_blocks
 
 class ImplementationAgent: 
     name = "implementer"
 
-    def run(self, context: ContextCapsule) -> AgentResult: 
-        request = context.task_contract.resolved_task.lower()
+    def __init__(self) -> None:
+        self.llm = LLMService()
+    
+    def run(self, context: ContextCapsule) -> AgentResult:
+        instructions = build_implementer_instructions()
+        prompt = build_implementer_prompt(context)
 
-        calculator_code = context.relevant_files.get("src/calculator.py", "")
-        test_code = context.relevant_files.get("tests/test_calculator.py", "")
-
-        changes: list[CodeChange] = []
-
-        if "subtract" in request:
-            if "def subtract" not in calculator_code:
-                calculator_code = calculator_code.rstrip() + "\n\n\ndef subtract(a: int, b: int) -> int:\n    return a - b\n"
-
-            if "test_subtract" not in test_code:
-                test_code = self._ensure_import(test_code, "subtract")
-                test_code = test_code.rstrip() + "\n\n\ndef test_subtract():\n    assert subtract(5, 3) == 2\n"
-
-        elif "multiply" in request:
-            if "def multiply" not in calculator_code:
-                calculator_code = calculator_code.rstrip() + "\n\n\ndef multiply(a: int, b: int) -> int:\n    return a * b\n"
-
-            if "test_multiply" not in test_code:
-                test_code = self._ensure_import(test_code, "multiply")
-                test_code = test_code.rstrip() + "\n\n\ndef test_multiply():\n    assert multiply(5, 3) == 15\n"
-
-        elif "divide" in request:
-            if "def divide" not in calculator_code:
-                calculator_code = calculator_code.rstrip() + "\n\n\ndef divide(a: int, b: int) -> float:\n    if b == 0:\n        raise ValueError('Cannot divide by zero')\n    return a / b\n"
-
-            if "test_divide" not in test_code:
-                test_code = self._ensure_import(test_code, "divide")
-                test_code = test_code.rstrip() + "\n\n\ndef test_divide():\n    assert divide(6, 3) == 2\n\n\ndef test_divide_by_zero():\n    import pytest\n\n    with pytest.raises(ValueError):\n        divide(6, 0)\n"
-
-        else:
-            return AgentResult(
-                agent_name=self.name,
-                status="fail",
-                output=CodeChangeContract(changes=[], notes="Unsupported calculator task."),
-                evidence=["No matching determinstic implementation rule."],
+        try: 
+            raw_output = self.llm.generate(
+                instructions=instructions,
+                prompt=prompt,
             )
+
+            code_change_contract = parse_file_blocks(raw_output)
         
-        changes.append(
-            CodeChange(
-                path="src/calculator.py",
-                content=calculator_code,
-                reason="Update calculator implementation.",
-            )
-        )
-        changes.append(
-            CodeChange(
-                path="tests/test_calculator.py",
-                content=test_code,
-                reason="Update calculator tests.",
-            )
-        )
-
-        return AgentResult(
+            return AgentResult(
             agent_name=self.name,
             status="pass",
-            output=CodeChangeContract(changes=changes),
-            evidence=["Generated code changes within allowed calculator files."],
+            output=code_change_contract,
+            evidence=[
+                "LLM generated FILE block output.",
+                "Harness parsed output into CodeChangeContract.",
+            ],
         )
-    
-    def _ensure_import(self, test_code: str, symbol: str) -> str:
-        lines = test_code.splitlines()
 
-        for index, line in enumerate(lines):
-            if line.startswith("from calculator import"):
-                imports = line.replace("from calculator import", "").strip()
-                names = [name.strip() for name in imports.split(",") if name.strip()]
-                if symbol not in names:
-                    names.append(symbol)
-                lines[index] = "from calculator import " + ", ".join(sorted(names))
-                return "\n".join(lines) + "\n"
+        except FileBlockParseError as error:
+            return AgentResult(
+                agent_name="self.name",
+                status="fail",
+                output=CodeChangeContract(
+                    changes=[],
+                    notes=f"Could not parse LLM output: {error}",
+                ),
+                evidence=[
+                    "LLM output failed FILE block parsing.",
+                ],
+            )
 
-        return f"from calculator import {symbol}\n\n" + test_code
+        except Exception as error:
+            return AgentResult(
+                agent_name="self.name",
+                status="fail",
+                output=CodeChangeContract(
+                    changes=[],
+                    notes=f"LLM implementation failed: {error}",
+                ),
+                evidence=[
+                    "LLM service call failed.",
+                ],
+            )
