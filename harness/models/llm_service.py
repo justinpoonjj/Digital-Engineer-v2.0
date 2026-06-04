@@ -7,7 +7,7 @@ class LLMService:
     def __init__(self) -> None:
         load_dotenv()
 
-        self.model = os.getenv("LLM_MODEL", "qwen2.5-coder:7b")
+        self.model = os.getenv("LLM_MODEL", "qwen3-coder:30b ")
         self.client = OpenAI(
             api_key=os.getenv("LLM_API_KEY"),
             base_url=os.getenv("LLM_BASE_URL"),
