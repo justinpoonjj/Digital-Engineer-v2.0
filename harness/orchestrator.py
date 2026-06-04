@@ -84,7 +84,7 @@ class Orchestrator:
         completion_certificate = self.completion_gate.evaluate(
             task_contract=task_contract,
             validation_result=validation_result,
-            review_result=review_result,
+            review_result=review_result.output,
         )
 
         self.state_manager.record_run(task_contract, validation_result)
