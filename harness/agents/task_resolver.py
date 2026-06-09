@@ -1,50 +1,51 @@
 from harness.contracts import TaskContract
+from harness.localization.file_localizer import FileLocalizer
+from harness.localization.safety_filter import FileSafetyFilter
 
 #This is intentionally deterministic for now. Later, you can use an LLM for task resolution.
 
 class TaskResolverAgent: 
     name = "task_resolver"
 
-    def resolve(self, user_request: str) -> TaskContract:
-        normalized = user_request.lower()
+    def __init__(self) -> None: 
+        self.localizer = FileLocalizer()
+        self.safety_filter = FileSafetyFilter()
 
-        if "subtract" in normalized:
-            task_id = "calculator-subtract"
-            resolved_task = "Add a subtract(a, b) function to the calculator and test it."
-        elif "multiply" in normalized or "multiplication" in normalized:
-            task_id = "calculator-multiply"
-            resolved_task = "Add a multiply(a, b) function to the calculator and test it."
-        elif "divide" in normalized or "division" in normalized:
-            task_id = "calculator-divide"
-            resolved_task = "Add a divide(a, b) function to the calculator and test it."
-        else: 
-            task_id = "calculator-generic"
-            resolved_task = user_request
+    def resolve(self, user_request: str) -> TaskContract:
+        localization = self.localizer.localize(user_request)
+
+        candidate_files = localization.source_files + localization.test_files
+        safe_allowed_files = self.safety_filter.filter_editable_files(candidate_files)
 
         return TaskContract(
-            task_id=task_id,
+            task_id=f"{localization.feature_name}-task",
             user_request=user_request,
-            resolved_task=resolved_task,
-            task_type="calculator_feature",
-            required_files=[
-                "src/calculator.py",
-                "tests/test_calculator.py",
-            ],
-            allowed_files=[
-                "src/calculator.py",
-                "tests/test_calculator.py",
-            ],
-            forbidden_files=[
-                "AGENTS.md",
-                "progress.md",
-                "feature_list.json",
-                "run_history.json",
-                "failure_log.json",
-                "task_breakdown.md",
-            ],
-            validation_profile="calculator",
+            resolved_task=self._resolve_task_text(user_request),
+            task_type=f"{localization.feature_name}_feature",
+            required_files=safe_allowed_files,
+            allowed_files=safe_allowed_files,
+            forbidden_files=self.safety_filter.get_protected_files(),
+            validation_profile=localization.validation_profile,
             completion_evidence=[
-                "pytest tests/test_calculator.py passes",
-                "ruff check src/calculator.py tests/test_calculator.py passes",
+                f"pytest {' '.join(localization.test_files)} passes",
+                f"ruff check {' '.join(safe_allowed_files)} passes",
             ],
         )
+
+    def _resolve_task_text(self, user_request:str) -> str:
+        request = user_request.lower()
+
+        if "subtract" in request or "subtraction" in request:
+            return "Add a subtract(a, b) function to the calculator and test it."
+
+        if "multiply" in request or "multiplication" in request:
+            return "Add a multiply(a, b) function to the calculator and test it."
+
+        if "divide" in request or "division" in request:
+            return "Add a divide(a, b) function to the calculator and test it."
+
+        if "add" in request or "addition" in request:
+            return "Add an add(a, b) function to the calculator and test it."
+
+
+        return user_request
