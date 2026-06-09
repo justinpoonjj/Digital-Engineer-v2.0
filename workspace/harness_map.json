@@ -1,0 +1,23 @@
+{
+    "features": {
+        "calculator": {
+        "keywords": ["calculator", "add", "addition", "subtract", "subtraction", "multiply", "multiplication", "divide", "division"],
+        "source_files": ["src/calculator.py"],
+        "test_files": ["tests/test_calculator.py"],
+        "validation_profile": "calculator"
+        }
+    },
+    "protected_files": [
+        "AGENTS.md",
+        "progress.md",
+        "feature_list.json",
+        "run_history.json",
+        "failure_log.json",
+        "task_breakdown.md",
+        "harness_map.json"
+    ],
+    "editable_roots": [
+        "src",
+        "tests"
+    ]
+}
