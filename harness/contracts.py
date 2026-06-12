@@ -7,7 +7,7 @@ class TaskContract:
     user_request: str
     resolved_task: str
     task_type: str
-    required_files: str
+    required_files: list[str]
     allowed_files: list[str]
     forbidden_files: list[str]
     validation_profile: str

@@ -5,6 +5,7 @@ from harness.prompts.implementer_prompt import (
     build_implementer_prompt,
 )
 from harness.tools.file_block_parser import FileBlockParseError, parse_file_blocks
+from harness.tools.output_contract_validator import validate_code_change_contract
 
 class ImplementationAgent: 
     name = "implementer"
@@ -23,6 +24,7 @@ class ImplementationAgent:
             )
 
             code_change_contract = parse_file_blocks(raw_output)
+            validate_code_change_contract(context.task_contract,code_change_contract, True)
         
             return AgentResult(
             agent_name=self.name,

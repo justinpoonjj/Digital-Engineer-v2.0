@@ -1,39 +1,63 @@
 from harness.contracts import AgentResult, CodeChangeContract, ContextCapsule
-from harness.repair.deterministic_repairs import DeterministicRepairEngine
+from harness.models.llm_service import LLMService
+from harness.prompts.repair_prompt import (
+    build_repair_instructions,
+    build_repair_prompt,
+)
+from harness.tools.file_block_parser import FileBlockParseError, parse_file_blocks
+from harness.tools.output_contract_validator import validate_code_change_contract
+
 
 class RepairAgent:
     name = "repairer"
 
     def __init__(self) -> None:
-        self.deterministic_repairs = DeterministicRepairEngine()
+        self.llm = LLMService()
 
     def run(self, context: ContextCapsule) -> AgentResult:
-        validation_result = context.relevant_state["validation_result"]
-        repair_result = self.deterministic_repairs.try_repair(
-            task_contract=context.task_contract,
-            validation_result=validation_result,
-        )
+        instructions = build_repair_instructions()
+        prompt = build_repair_prompt(context)
 
-        if repair_result.repaired:
+        try:
+            raw_output = self.llm.generate(
+                instructions=instructions,
+                prompt=prompt,
+            )
+
+            code_change_contract = parse_file_blocks(raw_output)
+            validate_code_change_contract(context.task_contract,code_change_contract)
+
             return AgentResult(
                 agent_name=self.name,
                 status="pass",
+                output=code_change_contract,
+                evidence=[
+                    "LLM generated repair FILE block output. ",
+                    "Harness paresed repair output into CodeChangeContract. "
+                ]
+            )
+        except FileBlockParseError as error:
+            return AgentResult(
+                agent_name=self.name,
+                status="fail",
                 output=CodeChangeContract(
                     changes=[],
-                    notes="Deterministic repair was applied directly to workspace files.",
+                    notes=f"Could not parse LLM repair output: {error}",
                 ),
-                evidence=repair_result.evidence,
+                evidence=[
+                    "LLM repair output failed FILE block parsing."
+                ],
             )
-
-        return AgentResult(
-            agent_name=self.name,
-            status="fail",
-            output=CodeChangeContract(
-                changes=[],
-                notes="No deterministic repair was applied.",
-            ),
-            evidence=[
-                f"Validation failed with type: {validation_result.failure_type}",
-                *repair_result.evidence,
-            ],
-        )
+        
+        except Exception as error:
+            return AgentResult(
+                agent_name=self.name,
+                status="fail",
+                output=CodeChangeContract(
+                    changes=[],
+                    notes=f"LLM repair failed: {error}",
+                ),
+                evidence=[
+                    "LLM repair service call failed.",
+                ],
+            )

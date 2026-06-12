@@ -49,7 +49,7 @@ class DeterministicRepairEngine:
         )
 
         return DeterministicRepairResult(
-            repaired=result.returncode in [0, 1],
+            repaired=result.returncode==0,
             evidence=[
                 "Ran deterministic Ruff repair.",
                 result.stdout + result.stderr,
