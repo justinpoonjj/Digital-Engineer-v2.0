@@ -26,7 +26,7 @@ class HarnessRunResult:
     final_message: str
     trace: list[StageTrace]
 
-MAX_LLM_REPAIR_ATTEMPTS = 2
+MAX_LLM_REPAIR_ATTEMPTS = 4
 
 class Orchestrator:
     def __init__(self) -> None:
@@ -103,27 +103,29 @@ class Orchestrator:
             evidence=validation_result.command_outputs,
         ))
 
-        if not validation_result.passed and validation_result.repairable:
-            deterministic_repair = self.deterministic_repair_engine.try_repair(
-                task_contract=task_contract,
-                validation_result=validation_result,
-            )
-            
-            if deterministic_repair.repaired:
-                validation_result = self.validator.validate(task_contract)
+        for attempt in range(MAX_LLM_REPAIR_ATTEMPTS):
+            if validation_result.passed or not validation_result.repairable:
+                break
 
-            trace.append(StageTrace(
-                stage="deterministic_repair",
-                status="pass" if deterministic_repair.repaired else "fail",
-                input_summary=f"failure_type={repair_failure_type}",
-                output_summary="Deterministic repair attempted.",
-                evidence=deterministic_repair.evidence,
-            ))
+            if not validation_result.passed and validation_result.repairable:
+                deterministic_repair = self.deterministic_repair_engine.try_repair(
+                    task_contract=task_contract,
+                    validation_result=validation_result,
+                )
+                
+                if deterministic_repair.repaired:
+                    validation_result = self.validator.validate(task_contract)
 
-        if not validation_result.passed and validation_result.repairable:
-            for attempt in range(MAX_LLM_REPAIR_ATTEMPTS):
-                if validation_result.passed or not validation_result.repairable:
-                    break
+                trace.append(StageTrace(
+                    stage="deterministic_repair",
+                    status="pass" if deterministic_repair.repaired else "fail",
+                    input_summary=f"failure_type={repair_failure_type}",
+                    output_summary="Deterministic repair attempted.",
+                    evidence=deterministic_repair.evidence,
+                ))
+
+            if not validation_result.passed and validation_result.repairable:
+                
 
                 repair_context = self.context_manager.build_for_repairer(
                     task_contract=task_contract,
