@@ -1,5 +1,4 @@
 from harness.contracts import AgentResult, CodeChangeContract, ContextCapsule
-from harness.models.llm_service import LLMService
 from harness.prompts.repair_prompt import (
     build_repair_instructions,
     build_repair_prompt,
@@ -11,8 +10,13 @@ from harness.tools.output_contract_validator import validate_code_change_contrac
 class RepairAgent:
     name = "repairer"
 
-    def __init__(self) -> None:
-        self.llm = LLMService()
+    def __init__(self, llm=None) -> None:
+        if llm is None:
+            from harness.models.llm_service import LLMService
+
+            llm = LLMService()
+
+        self.llm = llm
 
     def run(self, context: ContextCapsule) -> AgentResult:
         instructions = build_repair_instructions()

@@ -9,6 +9,12 @@ def run_cli() -> None:
     
     orchestrator = Orchestrator()
     result = orchestrator.run(user_request)
+    for item in result.trace:
+        print(f"[{item.stage}] {item.status} \n")
+        print(f"Input: {item.input_summary} \n")
+        print(f"Output: {item.output_summary} \n")
+        if item.evidence:
+            print(f"Evidence: {item.evidence}\n")
+        print()
 
-    print()
     print(result.final_message)
